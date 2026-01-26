@@ -1,0 +1,87 @@
+{% extends "users/base.html" %}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<h1>My Profile</h1>
+
+<div id="profile-info">
+    <p><strong>Avatar:</strong> <img id="avatar-img" src="" width="100" alt="Avatar"></p>
+    <p><strong>Bio:</strong> <span id="bio-text"></span></p>
+    <p><strong>Reputation:</strong> <span id="reputation-text"></span></p>
+</div>
+
+<h2>Edit Profile</h2>
+<form id="profile-form">
+    <label for="avatar">Avatar URL:</label><br>
+    <input type="text" id="avatar" name="avatar_url"><br><br>
+
+    <label for="bio">Bio:</label><br>
+    <textarea id="bio" name="bio" rows="4"></textarea><br><br>
+
+    <label for="reputation">Reputation:</label><br>
+    <input type="number" id="reputation" name="reputation"><br><br>
+
+    <button type="submit">Save</button>
+</form>
+
+<h2>Danger Zone</h2>
+<button id="delete-btn" style="color: red;">Delete Profile</button>
+
+<script>
+async function loadProfile() {
+    const res = await fetch("{% url 'profile-detail' %}");
+    if (res.ok) {
+        const profile = await res.json();
+        document.getElementById("avatar-img").src = profile.avatar_url || "";
+        document.getElementById("bio-text").innerText = profile.bio || "Not provided";
+        document.getElementById("reputation-text").innerText = profile.reputation || 0;
+        document.getElementById("avatar").value = profile.avatar_url || "";
+        document.getElementById("bio").value = profile.bio || "";
+        document.getElementById("reputation").value = profile.reputation || 0;
+    } else {
+        alert("Profile not found");
+    }
+}
+
+document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = {
+        avatar_url: document.getElementById("avatar").value || "",
+        bio: document.getElementById("bio").value || ""
+    };
+    const repValue = document.getElementById("reputation").value;
+    if (repValue !== "") {
+        data.reputation = parseInt(repValue);
+    }
+
+    const res = await fetch("{% url 'profile-update' %}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+        alert("Profile updated!");
+        loadProfile();
+    } else {
+        const err = await res.json();
+        alert("Error: " + (err.error || "Unknown error"));
+    }
+});
+
+// Delete profile button
+document.getElementById("delete-btn").addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to delete your profile?")) return;
+    const res = await fetch("{% url 'profile-delete' %}", { method: "DELETE" });
+    if (res.ok) {
+        alert("Profile deleted!");
+        window.location.href = "/";
+    } else {
+        const err = await res.json();
+        alert("Error deleting profile: " + (err.error || "Unknown error"));
+    }
+});
+
+loadProfile();
+</script>
+{% endblock %}

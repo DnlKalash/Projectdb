@@ -1,0 +1,31 @@
+{% extends "users/base.html" %}
+
+{% block title %}Posts{% endblock %}
+
+{% block content %}
+<h1>Posts</h1>
+
+<!-- Кнопка создания нового поста -->
+<a href="{% url 'posts:post-create-page' %}">
+    <button>Create post</button>
+</a>
+
+<hr>
+
+{% for post in posts %}
+    <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+        <h2>{{ post.title }}</h2>
+        <p>{{ post.content|truncatechars:150 }}</p>
+        <small>Author ID: {{ post.author_id }}</small>
+        <br><br>
+        <a href="{% url 'posts:post-detail-page' post.id %}">Read more</a>
+    </div>
+{% empty %}
+    <p>No posts yet.</p>
+{% endfor %}
+
+<!-- Ссылка обратно на главную -->
+<a href="{% url 'htmlshablon' %}">
+    <button type="button">Back to main page</button>
+</a>
+{% endblock %}

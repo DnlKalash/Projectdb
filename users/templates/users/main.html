@@ -1,0 +1,29 @@
+{% extends "users/base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<h1>Main page</h1>
+
+{% if username %}
+    <p>You are logged in as {{ username }}</p>
+
+    <!-- Профиль -->
+    <a href="{% url 'profile-detail-page' %}">
+        <button type="button">Go to Profile</button>
+    </a>
+
+    <!-- МОИ ПОСТЫ (переход в posts app) -->
+    <a href="{% url 'posts:posts-list-page' %}">
+        <button type="button">My posts</button>
+    </a>
+
+    <!-- Logout -->
+    <form action="{% url 'logout' %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit">Logout</button>
+    </form>
+{% else %}
+    <p>You are not logged in</p>
+{% endif %}
+{% endblock %}

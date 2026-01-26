@@ -1,0 +1,21 @@
+{% extends "users/base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<h1>{{ post.title }}</h1>
+
+<p>{{ post.content }}</p>
+
+<small>Author ID: {{ post.author_id }}</small><br>
+<small>Created at: {{ post.created_at }}</small>
+
+<hr>
+
+<form action="{% url 'post-delete-page' post.id %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Delete post</button>
+</form>
+
+<a href="{% url 'posts-list-page' %}">← Back</a>
+{% endblock %}
