@@ -65,6 +65,15 @@ def init_posts_table():
             END IF;
         END $$;
         """)
+        class Migration(migrations.Migration):
+            initial = True
+            dependencies = [
+        
+                ('users', '0001_initial'),
+             ]
+            operations = [
+                migrations.RunPython(init_tables),
+                ]
 
         # -------------------------
         # POST_TAGS (M2M)

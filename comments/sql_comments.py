@@ -209,3 +209,4 @@ def count_comments_by_post(post_id):
     with connection.cursor() as cursor:
         cursor.execute("SELECT count_comments_by_post_func(%s)", (post_id,))
         return cursor.fetchone()[0]
+    
