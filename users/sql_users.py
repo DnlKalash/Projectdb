@@ -31,14 +31,7 @@ def create_users_table():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
-class Migration(migrations.Migration):
-    initial = True
 
-    dependencies = []
-
-    operations = [
-        migrations.RunPython(create_users_table),
-    ]
 
         # =========================
         # Регистрация нового пользователя с проверкой уникальности
