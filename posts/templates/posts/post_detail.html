@@ -12,10 +12,11 @@
 
 <hr>
 
-<form action="{% url 'post-delete-page' post.id %}" method="post">
+<form action="{% url 'posts:post-delete-page' post.id %}" method="post">
     {% csrf_token %}
     <button type="submit">Delete post</button>
 </form>
 
-<a href="{% url 'posts-list-page' %}">← Back</a>
+<!-- Ссылка обратно на список постов с namespace -->
+<a href="{% url 'posts:posts-list-page' %}">← Back</a>
 {% endblock %}
