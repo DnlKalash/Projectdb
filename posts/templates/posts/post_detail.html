@@ -3,20 +3,334 @@
 {% block title %}{{ post.title }}{% endblock %}
 
 {% block content %}
-<h1>{{ post.title }}</h1>
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1>{{ post.title }}</h1>
 
-<p>{{ post.content }}</p>
+    <div style="margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+        <p style="white-space: pre-wrap; line-height: 1.6;">{{ post.content }}</p>
+    </div>
 
-<small>Author ID: {{ post.author_id }}</small><br>
-<small>Created at: {{ post.created_at }}</small>
+    <div style="margin: 15px 0; color: #666; font-size: 14px;">
+        <small>Author ID: {{ post.author_id }}</small><br>
+        <small>Created: {{ post.created_at|date:"Y-m-d H:i" }}</small>
+    </div>
 
-<hr>
+    <!-- ======================
+         REACTIONS
+         ====================== -->
+    <div style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <form method="post" action="{% url 'reactions:toggle-reaction' 'post' post.id 'like' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" style="
+                    padding: 8px 16px; 
+                    border: 2px solid #4caf50; 
+                    border-radius: 20px; 
+                    background: {% if user_reaction == 'like' %}#4caf50{% else %}white{% endif %}; 
+                    color: {% if user_reaction == 'like' %}white{% else %}#4caf50{% endif %};
+                    cursor: pointer;
+                    font-weight: bold;
+                    transition: all 0.2s;
+                ">
+                    👍 Like <span style="background: rgba(0,0,0,0.1); padding: 2px 8px; border-radius: 10px; margin-left: 5px;">{{ likes_count }}</span>
+                </button>
+            </form>
+            
+            <form method="post" action="{% url 'reactions:toggle-reaction' 'post' post.id 'love' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" style="
+                    padding: 8px 16px; 
+                    border: 2px solid #ff4081; 
+                    border-radius: 20px; 
+                    background: {% if user_reaction == 'love' %}#ff4081{% else %}white{% endif %}; 
+                    color: {% if user_reaction == 'love' %}white{% else %}#ff4081{% endif %};
+                    cursor: pointer;
+                    font-weight: bold;
+                    transition: all 0.2s;
+                ">
+                    ❤️ Love <span style="background: rgba(0,0,0,0.1); padding: 2px 8px; border-radius: 10px; margin-left: 5px;">{{ loves_count }}</span>
+                </button>
+            </form>
+            
+            <form method="post" action="{% url 'reactions:toggle-reaction' 'post' post.id 'dislike' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" style="
+                    padding: 8px 16px; 
+                    border: 2px solid #f44336; 
+                    border-radius: 20px; 
+                    background: {% if user_reaction == 'dislike' %}#f44336{% else %}white{% endif %}; 
+                    color: {% if user_reaction == 'dislike' %}white{% else %}#f44336{% endif %};
+                    cursor: pointer;
+                    font-weight: bold;
+                    transition: all 0.2s;
+                ">
+                    👎 Dislike <span style="background: rgba(0,0,0,0.1); padding: 2px 8px; border-radius: 10px; margin-left: 5px;">{{ dislikes_count }}</span>
+                </button>
+            </form>
+        </div>
+    </div>
 
-<form action="{% url 'posts:post-delete-page' post.id %}" method="post">
-    {% csrf_token %}
-    <button type="submit">Delete post</button>
-</form>
+    <!-- ======================
+         TAGS
+         ====================== -->
+    <div style="margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <strong>Tags:</strong>
+            <a 
+                href="{% url 'tags:list_tags' %}" 
+                style="font-size: 14px; color: #2196f3; text-decoration: none;"
+            >
+                View all tags →
+            </a>
+        </div>
 
-<!-- Ссылка обратно на список постов с namespace -->
-<a href="{% url 'posts:posts-list-page' %}">← Back</a>
-{% endblock %}
+        <div style="margin-bottom: 15px;">
+            {% if post.tag_names %}
+                {% for tag in post.tag_names %}
+                    {% if tag %}
+                    <div style="display: inline-flex; align-items: center; margin-right: 6px; margin-bottom: 6px;">
+                        <a
+                            href="{% url 'posts:posts-by-tag-page' tag %}"
+                            style="
+                                display: inline-block;
+                                padding: 6px 12px;
+                                background: #e3f2fd;
+                                border: 1px solid #90caf9;
+                                border-radius: 16px 0 0 16px;
+                                text-decoration: none;
+                                color: #1976d2;
+                                font-size: 14px;
+                            "
+                        >
+                            #{{ tag }}
+                        </a>
+                        <form 
+                            action="{% url 'posts:remove-tag' post.id tag %}" 
+                            method="post" 
+                            style="display: inline; margin: 0;"
+                        >
+                            {% csrf_token %}
+                            <button 
+                                type="submit"
+                                style="
+                                    padding: 6px 8px;
+                                    background: #ffcdd2;
+                                    border: 1px solid #ef9a9a;
+                                    border-left: none;
+                                    border-radius: 0 16px 16px 0;
+                                    color: #c62828;
+                                    font-size: 12px;
+                                    cursor: pointer;
+                                "
+                                onclick="return confirm('Remove tag {{ tag }}?');"
+                            >
+                                ✕
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p style="color: #999; font-size: 14px;">No tags yet</p>
+            {% endif %}
+        </div>
+
+        <form action="{% url 'posts:add-tag' post.id %}" method="post" style="display: flex; gap: 8px;">
+            {% csrf_token %}
+            <input 
+                type="text" 
+                name="tag_name" 
+                placeholder="Enter tag name..." 
+                required
+                style="
+                    flex: 1;
+                    padding: 8px 12px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    font-size: 14px;
+                "
+            >
+            <button 
+                type="submit"
+                style="
+                    padding: 8px 16px;
+                    background: #4caf50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    white-space: nowrap;
+                "
+            >
+                ➕ Add Tag
+            </button>
+        </form>
+        <p style="margin-top: 10px; font-size: 12px; color: #666;">
+            💡 After adding a tag, you'll be redirected to the tags list
+        </p>
+    </div>
+
+    <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+
+    <!-- ======================
+         COMMENTS
+         ====================== -->
+    <div style="margin: 20px 0;">
+        <h2 style="margin-bottom: 20px;">Comments</h2>
+        
+        <form method="post" action="{% url 'posts:add-comment' post.id %}" style="margin-bottom: 30px;">
+            {% csrf_token %}
+            <textarea 
+                name="content" 
+                rows="3" 
+                placeholder="Write a comment..." 
+                required
+                style="
+                    width: 100%; 
+                    padding: 10px; 
+                    font-size: 14px; 
+                    border: 1px solid #ddd; 
+                    border-radius: 6px; 
+                    resize: vertical;
+                    box-sizing: border-box;
+                "
+            ></textarea>
+            <button 
+                type="submit"
+                style="
+                    margin-top: 8px;
+                    padding: 8px 16px;
+                    background: #4caf50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                "
+            >
+                ➕ Add Comment
+            </button>
+        </form>
+
+                <!-- Render comments as flat list (not recursive for simplicity) -->
+                <div id="comments-list">
+                    {% for comment in comments %}
+                        <!-- Root comment -->
+                        <div style="margin-bottom: 15px; padding: 12px; background: #f9f9f9; border-radius: 6px; border-left: 3px solid #2196f3;">
+                            <div style="margin-bottom: 8px;">
+                                <strong>User {{ comment.user_id }}</strong>
+                                <small style="color: #999; margin-left: 8px;">{{ comment.created_at|date:"Y-m-d H:i" }}</small>
+                            </div>
+                            <p style="margin: 0 0 10px 0; white-space: pre-wrap; line-height: 1.5;">{{ comment.content }}</p>
+
+                            <!-- Reply form -->
+                            <form method="post" action="{% url 'posts:add-comment' post.id comment.id %}" style="display: flex; gap: 8px; margin-bottom: 5px;">
+                                {% csrf_token %}
+                                <input type="text" name="content" placeholder="Reply..." required
+                                       style="flex: 1; padding: 6px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
+                                <button type="submit"
+                                        style="padding: 6px 12px; background: #2196f3; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer;">
+                                    Reply
+                                </button>
+                            </form>
+
+                            <!-- Delete button -->
+                            <form method="post" action="{% url 'comments:delete-comment' comment.id post.id %}" style="margin-top: 5px;">
+                                {% csrf_token %}
+                                <button type="submit" style="padding: 4px 10px; font-size: 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    Delete
+                                </button>
+                            </form>
+                            
+
+                            <!-- Child comments -->
+                            {% if comment.children %}
+                                <div style="margin-left: 20px; margin-top: 10px;">
+                                    {% for child in comment.children %}
+                                        <div style="margin-left: 20px; margin-top: 10px; padding: 10px; background: #fff; border-radius: 4px; border-left: 2px solid #90caf9;">
+                                            <div style="margin-bottom: 5px;">
+                                                <strong>User {{ child.user_id }}</strong>
+                                                <small style="color: #999; margin-left: 8px;">{{ child.created_at|date:"Y-m-d H:i" }}</small>
+                                            </div>
+                                            <p style="margin: 0; white-space: pre-wrap; line-height: 1.4; font-size: 14px;">{{ child.content }}</p>
+                                            
+                                            <!-- Nested child comments (level 2) -->
+                                            {% if child.children %}
+                                                <div style="margin-left: 20px; margin-top: 8px;">
+                                                    {% for grandchild in child.children %}
+                                                        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; border-left: 2px solid #bbdefb;">
+                                                            <div style="margin-bottom: 4px;">
+                                                                <strong>User {{ grandchild.user_id }}</strong>
+                                                                <small style="color: #999; margin-left: 8px;">{{ grandchild.created_at|date:"Y-m-d H:i" }}</small>
+                                                            </div>
+                                                            <p style="margin: 0; white-space: pre-wrap; line-height: 1.4; font-size: 13px;">{{ grandchild.content }}</p>
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    
+                    {% if not comments %}
+                        <p style="color: #999;">No comments yet. Be the first to comment!</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+            
+            <!-- ======================
+                 ACTIONS
+                 ====================== -->
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <a 
+                    href="{% url 'posts:posts-list-page' %}" 
+                    style="
+                        padding: 8px 16px;
+                        background: #2196f3;
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 4px;
+                        font-size: 14px;
+                    "
+                >
+                    ← Back to posts
+                </a>
+
+                <form action="{% url 'posts:post-delete-page' post.id %}" method="post" style="margin: 0;">
+                    {% csrf_token %}
+                    <button 
+                        type="submit" 
+                        style="
+                            padding: 8px 16px;
+                            background: #f44336;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        "
+                        onclick="return confirm('Are you sure you want to delete this post?');"
+                    >
+                        🗑️ Delete post
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <style>
+            button:hover {
+                opacity: 0.9;
+                transform: scale(1.05);
+            }
+            a:hover {
+                opacity: 0.9;
+            }
+        </style>
+
+        {% endblock %}

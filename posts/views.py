@@ -1,66 +1,166 @@
 from django.shortcuts import render, redirect
+from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from users.views import jwt_required
-from .sql_posts import (
+from comments import sql_comments
+from reactions import sql_reactions
+from posts.sql_posts import (
     init_posts_table,
+    create_post_with_tags,
     get_all_posts,
     get_post_by_id,
-    create_post,
-    delete_post
+    get_post_with_tags,
+    delete_post,
+    get_posts_by_tag,
+    add_tag_to_post,
+    remove_tag_from_post,
+    get_all_tags,
 )
 
-# Создаём таблицу при старте
-init_posts_table()
+
+_table_initialized = False
+
+def ensure_posts_table():
+    global _table_initialized
+    if not _table_initialized:
+        init_posts_table()
+        _table_initialized = True
 
 # ======================
-# LIST
+# LIST ALL POSTS
 # ======================
 def posts_list_page(request):
-    posts = get_all_posts()
-    return render(request, "posts/posts_list.html", {
-        "posts": posts
+    ensure_posts_table()
+    posts = get_all_posts(limit=50, offset=0)
+    return render(request, "posts/posts_list.html", {"posts": posts})
+
+# ======================
+# LIST POSTS BY TAG
+# ======================
+def posts_by_tag_page(request, tag_name):
+    ensure_posts_table()
+    posts = get_posts_by_tag(tag_name)
+    return render(request, "posts/posts_by_tag.html", {
+        "posts": posts, 
+        "tag_name": tag_name
     })
 
-
 # ======================
-# DETAIL
+# POST DETAIL WITH COMMENTS AND REACTIONS
 # ======================
 def post_detail_page(request, post_id):
-    post = get_post_by_id(post_id)
+    """
+    Детальная страница поста с комментариями и реакциями
+    """
+    ensure_posts_table()
+    post = get_post_with_tags(post_id)
     if not post:
         return render(request, "posts/post_not_found.html", status=404)
 
+    
+    comments_tree = sql_comments.get_comments_tree(post_id)
+
+    
+    comments_dict = {c['id']: dict(c, children=[]) for c in comments_tree}
+    root_comments = []
+
+    for c in comments_tree:
+        if c['parent_id']:
+            parent = comments_dict.get(c['parent_id'])
+            if parent:
+                parent['children'].append(comments_dict[c['id']])
+        else:
+            root_comments.append(comments_dict[c['id']])
+
+    
+    reactions_stats = sql_reactions.get_post_reactions_stats(post_id)
+    likes_count = 0
+    loves_count = 0
+    dislikes_count = 0
+    
+    for stat in reactions_stats:
+        if stat['reaction_type'] == 'like':
+            likes_count = stat['count']
+        elif stat['reaction_type'] == 'love':
+            loves_count = stat['count']
+        elif stat['reaction_type'] == 'dislike':
+            dislikes_count = stat['count']
+
+    # Получаем реакцию текущего пользователя
+    user_id = request.session.get('user_id', 1)
+    user_reaction = sql_reactions.get_user_reaction_on_post(user_id, post_id)
+
     return render(request, "posts/post_detail.html", {
-        "post": post
+        "post": post,
+        "comments": root_comments,
+        "likes_count": likes_count,
+        "loves_count": loves_count,
+        "dislikes_count": dislikes_count,
+        "user_reaction": user_reaction,
     })
 
-
 # ======================
-# CREATE
+# CREATE POST WITH TAGS
 # ======================
 @jwt_required
 @require_http_methods(["GET", "POST"])
 def post_create_page(request):
+    ensure_posts_table()
+    tags = get_all_tags()
+
     if request.method == "POST":
         title = request.POST.get("title")
         content = request.POST.get("content")
-        author_id = request.user_id  # берём из JWT декоратора
+        selected_tags = request.POST.getlist("tags")
+        author_id = request.user_id
 
-        if title and content:
-            create_post(title, content, author_id)
-            return redirect("posts:posts-list-page")
+        if not title or not content:
+            error = "Title and content are required."
+            return render(request, "posts/post_create.html", {"tags": tags, "error": error})
 
-    return render(request, "posts/post_create.html")
+        create_post_with_tags(title, content, author_id, selected_tags)
+        return redirect("posts:posts-list-page")
 
-
+    return render(request, "posts/post_create.html", {"tags": tags})
 
 # ======================
-# DELETE
+# DELETE POST
 # ======================
 @jwt_required
 @require_http_methods(["POST"])
 def post_delete_page(request, post_id):
-    delete_post(post_id)
-    # namespace исправлен
+    ensure_posts_table()
+    deleted_id = delete_post(post_id)
+    if not deleted_id:
+        return render(request, "posts/post_not_found.html", status=404)
     return redirect("posts:posts-list-page")
+
+# ======================
+# ADD TAG TO POST
+# ======================
+def add_tag_to_post_view(request, post_id):
+    
+    ensure_posts_table()
+    if request.method == 'POST':
+        tag_name = request.POST.get('tag_name', '').strip()
+        
+        if tag_name:
+            add_tag_to_post(post_id, tag_name)
+        
+        # Редирект на список тегов
+        return redirect('/tags/')
+    
+    return redirect('posts:post-detail-page', post_id=post_id)
+
+# ======================
+# REMOVE TAG FROM POST
+# ======================
+def remove_tag_from_post_view(request, post_id, tag_name):
+    
+    ensure_posts_table()
+    if request.method == 'POST':
+        remove_tag_from_post(post_id, tag_name)
+    
+    # Редирект обратно на пост
+    return redirect('posts:post-detail-page', post_id=post_id)

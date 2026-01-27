@@ -1,0 +1,71 @@
+{% extends "users/base.html" %}
+
+{% block title %}All Tags{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1>All Tags</h1>
+        <a 
+            href="{% url 'posts:posts-list-page' %}" 
+            style="
+                padding: 10px 20px;
+                background: #2196f3;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+            "
+        >
+            ← Back to Posts
+        </a>
+    </div>
+
+    {% if tags %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
+            {% for tag in tags %}
+            <div style="
+                padding: 20px;
+                background: #f9f9f9;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <a 
+                    href="{% url 'posts:posts-by-tag-page' tag.name %}"
+                    style="
+                        text-decoration: none;
+                        color: #1976d2;
+                        font-size: 18px;
+                        font-weight: bold;
+                    "
+                >
+                    #{{ tag.name }}
+                </a>
+                <span style="
+                    background: #e3f2fd;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    color: #1976d2;
+                ">
+                    {{ tag.post_count }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="
+            padding: 40px;
+            text-align: center;
+            background: #f5f5f5;
+            border-radius: 8px;
+            color: #999;
+        ">
+            <p style="font-size: 18px;">No tags yet</p>
+            <p>Tags will appear here when you add them to posts</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

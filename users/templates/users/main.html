@@ -18,6 +18,11 @@
         <button type="button">My posts</button>
     </a>
 
+    <!-- Все теги -->
+    <a href="{% url 'tags:list_tags' %}">
+        <button type="button">All tags</button>
+    </a>
+
     <!-- Logout -->
     <form action="{% url 'logout' %}" method="post" style="display:inline;">
         {% csrf_token %}

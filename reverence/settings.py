@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'comments',
     'posts',
     'tags',
-    'client'
+    'client',
+    'reactions'
 
 ]
 
