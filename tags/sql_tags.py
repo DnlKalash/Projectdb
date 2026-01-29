@@ -25,11 +25,12 @@ def create_tags_tables():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tags (
                 id SERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL
-            )
+                name TEXT UNIQUE NOT NULL,
+                CHECK (char_length(name) >= 1)
+            );
         """)
 
-        # Изменить тип колонки, если она уже существует как VARCHAR
+        
         cursor.execute("""
             DO $$
             BEGIN
@@ -45,7 +46,7 @@ def create_tags_tables():
             END $$;
         """)
 
-        # Таблица связи постов и тегов
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS post_tags (
                 post_id INT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -119,41 +120,7 @@ def create_tags_tables():
             $$ LANGUAGE plpgsql;
         """)
 
-        # =========================
-        # ATTACH tag to post
-        # =========================
-        cursor.execute("DROP FUNCTION IF EXISTS attach_tag_to_post(INT, TEXT)")
-        cursor.execute("""
-            CREATE FUNCTION attach_tag_to_post(p_post_id INT, p_tag_name TEXT)
-            RETURNS TABLE (
-                post_id INT,
-                tag_id INT,
-                tag_name TEXT
-            ) AS $$
-            DECLARE
-                t_id INT;
-            BEGIN
-                -- ищем тег по имени
-                SELECT tags.id INTO t_id FROM tags WHERE tags.name = p_tag_name;
-
-                -- если тега нет, создаём его
-                IF t_id IS NULL THEN
-                    INSERT INTO tags(name) VALUES (p_tag_name) RETURNING tags.id INTO t_id;
-                END IF;
-
-                -- создаём связь пост <-> тег (если её ещё нет)
-                INSERT INTO post_tags(post_id, tag_id)
-                VALUES (p_post_id, t_id)
-                ON CONFLICT DO NOTHING;
-
-                -- возвращаем результат для проверки
-                RETURN QUERY
-                SELECT p_post_id AS post_id, t_id AS tag_id, p_tag_name AS tag_name;
-            END;
-            $$ LANGUAGE plpgsql;
-        """)
-
-    print("✔ tags and post_tags tables + SQL functions ready")
+       
 
 
 # =========================
@@ -182,7 +149,7 @@ def delete_tag(tag_id):
 
 def update_tag(tag_id, name):
     """
-    Обновляет имя тега по его ID.
+   
     """
     with connection.cursor() as cursor:
         cursor.execute("""
@@ -193,7 +160,3 @@ def update_tag(tag_id, name):
         """, (name, tag_id))
         return cursor.fetchone()
 
-def attach_tag_to_post(post_id, tag_name):
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT * FROM attach_tag_to_post(%s, %s)", (post_id, tag_name))
-        return dict_fetchall(cursor)

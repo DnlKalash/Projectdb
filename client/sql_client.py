@@ -20,18 +20,28 @@ def dict_fetchall(cursor):
 # =========================
 def create_profile_table_and_functions():
     with connection.cursor() as cursor:
-        # Таблица профиля
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS profile (
             id SERIAL PRIMARY KEY,
-            user_id INT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            avatar_url TEXT DEFAULT '',
-            bio TEXT DEFAULT '',
-            reputation INT DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """)
+
+            user_id INT UNIQUE NOT NULL
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+
+            avatar_url TEXT NOT NULL DEFAULT '',
+            bio TEXT NOT NULL DEFAULT '',
+
+            reputation INT NOT NULL DEFAULT 0,
+
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            -- CHECK constraints
+            CHECK (reputation >= 0),
+            CHECK (char_length(bio) <= 500)
+        );
+
+                """)
 
         # =========================
         # Триггер для обновления updated_at
@@ -155,7 +165,7 @@ def create_profile(user_id, avatar_url=None, bio=None):
         return dict_fetchone(cursor)
 
 def get_profile(user_id):
-    create_profile_table_and_functions()
+    create_profile_table_and_functions()  # ДОБАВЛЕНО: создаем функции если их нет
     with connection.cursor() as cursor:
         cursor.execute("SELECT * FROM get_profile_func(%s)", (user_id,))
         return dict_fetchone(cursor)

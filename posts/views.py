@@ -5,17 +5,20 @@ from django.views.decorators.csrf import csrf_exempt
 from users.views import jwt_required
 from comments import sql_comments
 from reactions import sql_reactions
+from django.db import connection
 from posts.sql_posts import (
     init_posts_table,
     create_post_with_tags,
     get_all_posts,
     get_post_by_id,
     get_post_with_tags,
-    delete_post,
+    delete_post as delete_post_sql,  # ИЗМЕНЕНО: переименовали импорт
     get_posts_by_tag,
     add_tag_to_post,
     remove_tag_from_post,
     get_all_tags,
+    update_my_post,
+    get_my_posts  # ДОБАВЛЕНО: импортируем get_my_posts
 )
 
 
@@ -30,6 +33,12 @@ def ensure_posts_table():
 # ======================
 # LIST ALL POSTS
 # ======================
+
+def dict_fetchall(cursor):
+    """Преобразуем результат SQL в список словарей"""
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
 def posts_list_page(request):
     ensure_posts_table()
     posts = get_all_posts(limit=50, offset=0)
@@ -87,7 +96,7 @@ def post_detail_page(request, post_id):
         elif stat['reaction_type'] == 'dislike':
             dislikes_count = stat['count']
 
-    # Получаем реакцию текущего пользователя
+    
     user_id = request.session.get('user_id', 1)
     user_reaction = sql_reactions.get_user_reaction_on_post(user_id, post_id)
 
@@ -120,42 +129,53 @@ def post_create_page(request):
             return render(request, "posts/post_create.html", {"tags": tags, "error": error})
 
         create_post_with_tags(title, content, author_id, selected_tags)
-        return redirect("posts:posts-list-page")
+        return redirect("posts:my-posts")  
+
 
     return render(request, "posts/post_create.html", {"tags": tags})
 
 # ======================
 # DELETE POST
 # ======================
+
 @jwt_required
 @require_http_methods(["POST"])
-def post_delete_page(request, post_id):
-    ensure_posts_table()
-    deleted_id = delete_post(post_id)
-    if not deleted_id:
-        return render(request, "posts/post_not_found.html", status=404)
-    return redirect("posts:posts-list-page")
+def delete_post_view(request, post_id):  
+    user_id = request.user_id  
+    try:
+        deleted_id = delete_post_sql(post_id, user_id)  
+    except Exception as e:
+        posts = get_my_posts(user_id)  
+        return render(request, "posts/my_posts.html", {"error": str(e), "posts": posts})
+
+    return redirect("posts:my-posts")
+
 
 # ======================
 # ADD TAG TO POST
 # ======================
+@jwt_required
 def add_tag_to_post_view(request, post_id):
-    
-    ensure_posts_table()
+    ensure_posts_table()  
     if request.method == 'POST':
         tag_name = request.POST.get('tag_name', '').strip()
-        
         if tag_name:
-            add_tag_to_post(post_id, tag_name)
+            user_id = request.user_id  
+            try:
+                add_tag_to_post(post_id, tag_name, user_id)
+            except Exception as e:
+                return redirect('posts:post-detail-page', post_id=post_id)
         
-        # Редирект на список тегов
-        return redirect('/tags/')
+        
+        return redirect('posts:post-detail-page', post_id=post_id)
     
     return redirect('posts:post-detail-page', post_id=post_id)
+
 
 # ======================
 # REMOVE TAG FROM POST
 # ======================
+@jwt_required
 def remove_tag_from_post_view(request, post_id, tag_name):
     
     ensure_posts_table()
@@ -164,3 +184,37 @@ def remove_tag_from_post_view(request, post_id, tag_name):
     
     # Редирект обратно на пост
     return redirect('posts:post-detail-page', post_id=post_id)
+
+@jwt_required
+def my_posts_view(request):
+    """HTTP-запрос для отображения только моих постов"""
+    user_id = request.user_id 
+    posts = get_my_posts(user_id)  # ИЗМЕНЕНО: используем импортированную функцию
+    
+    return render(request, "posts/my_posts.html", {"posts": posts})
+
+@jwt_required
+@require_http_methods(["GET", "POST"])
+def post_update_page(request, post_id):
+    """HTTP-запрос для редактирования поста пользователя через SQL"""
+    user_id = request.user_id  # user_id берём из JWT
+
+    # Получаем пост (SQL)
+    post = get_post_with_tags(post_id)
+    if not post:
+        return render(request, "posts/error.html", {"error": "Post not found"})
+
+    if request.method == "POST":
+        title = request.POST.get("title")
+        content = request.POST.get("content")
+
+        if not title or not content:
+            return render(request, "posts/post_update.html", {"post": post, "error": "Title and content cannot be empty."})
+
+        # Обновляем пост через SQL-функцию (вся логика проверки владельца в SQL)
+        updated_post = update_my_post(post_id, user_id, title, content)
+
+        return redirect("posts:my-posts")
+
+    # GET-запрос — показываем форму
+    return render(request, "posts/post_update.html", {"post": post})

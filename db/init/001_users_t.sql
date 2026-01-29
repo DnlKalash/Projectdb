@@ -1,0 +1,8 @@
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(150) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE
+        CHECK (email LIKE '%@%'),
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

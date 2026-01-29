@@ -29,29 +29,58 @@ def init_reactions_table():
         # REACTIONS TABLE
         # -------------------------
         cursor.execute("""
-        CREATE TABLE IF NOT EXISTS reactions (
-            id SERIAL PRIMARY KEY,
-            user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            reactable_type VARCHAR(20) NOT NULL CHECK (reactable_type IN ('post', 'comment')),
-            reactable_id INT NOT NULL,
-            reaction_type VARCHAR(20) NOT NULL CHECK (reaction_type IN ('like', 'love', 'dislike')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, reactable_type, reactable_id)
-        )
+                       CREATE TABLE IF NOT EXISTS reactions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reactable_type VARCHAR(20) NOT NULL CHECK (reactable_type IN ('post', 'comment')),
+    reactable_id INT NOT NULL CHECK (reactable_id > 0),
+    reaction_type VARCHAR(20) NOT NULL CHECK (reaction_type IN ('like', 'love', 'dislike')),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, reactable_type, reactable_id)
+);
+                """)
+
+        cursor.execute("""
+        CREATE OR REPLACE FUNCTION validate_reaction_fk()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            IF (NEW.reactable_type = 'post') THEN
+                PERFORM 1 FROM posts WHERE id = NEW.reactable_id;
+                IF NOT FOUND THEN
+                    RAISE EXCEPTION 'Post id % does not exist', NEW.reactable_id;
+                END IF;
+            ELSIF (NEW.reactable_type = 'comment') THEN
+                PERFORM 1 FROM comments WHERE id = NEW.reactable_id;
+                IF NOT FOUND THEN
+                    RAISE EXCEPTION 'Comment id % does not exist', NEW.reactable_id;
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
         """)
 
-        # Индексы для быстрого поиска
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_reactions_post 
-        ON reactions(reactable_type, reactable_id) 
-        WHERE reactable_type = 'post'
+        DROP TRIGGER IF EXISTS trg_validate_reaction ON reactions;
+        CREATE TRIGGER trg_validate_reaction
+        BEFORE INSERT ON reactions
+        FOR EACH ROW
+        EXECUTE FUNCTION validate_reaction_fk();
         """)
         
+
+                # Индексы для быстрого поиска
         cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_reactions_comment 
-        ON reactions(reactable_type, reactable_id) 
-        WHERE reactable_type = 'comment'
-        """)
+                CREATE INDEX IF NOT EXISTS idx_reactions_post 
+                ON reactions(reactable_type, reactable_id) 
+                WHERE reactable_type = 'post'
+                """)
+                
+        cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_reactions_comment 
+                ON reactions(reactable_type, reactable_id) 
+                WHERE reactable_type = 'comment'
+                """)
 
         # =========================
         # ADD OR UPDATE REACTION

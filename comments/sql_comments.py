@@ -35,8 +35,9 @@ def init_comments_table():
             user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             content TEXT NOT NULL,
             parent_id INT REFERENCES comments(id) ON DELETE CASCADE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CHECK (char_length(content) >= 1)
+        );
         """)
 
         # -------------------------
@@ -144,17 +145,42 @@ def init_comments_table():
         # -------------------------
         # DELETE COMMENT
         # -------------------------
-        cursor.execute("DROP FUNCTION IF EXISTS delete_comment_func(INT)")
+        cursor.execute("DROP FUNCTION IF EXISTS delete_comment_func(INT, INT);")
+
         cursor.execute("""
-        CREATE FUNCTION delete_comment_func(p_id INT)
-        RETURNS INT AS $$
-        DECLARE del_id INT;
-        BEGIN
-            DELETE FROM comments WHERE comments.id = p_id RETURNING comments.id INTO del_id;
-            RETURN del_id;
-        END;
-        $$ LANGUAGE plpgsql;
+            CREATE OR REPLACE FUNCTION delete_comment_func(
+            p_comment_id INT,
+            p_user_id INT
+            )
+            RETURNS INT AS $$
+            DECLARE
+            v_comment_user_id INT;
+            BEGIN
+            -- Получаем user_id владельца комментария
+            SELECT user_id INTO v_comment_user_id
+            FROM comments
+            WHERE id = p_comment_id;
+    
+            -- Проверяем существование комментария
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'Comment with id % not found', p_comment_id;
+            END IF;
+    
+            -- Проверяем владельца (с отладочной информацией)
+            IF v_comment_user_id <> p_user_id THEN
+                RAISE EXCEPTION 'Cannot delete comment. Comment owner: %, Your user_id: %', 
+                v_comment_user_id, p_user_id;
+            END IF;
+    
+            -- Удаляем комментарий
+            DELETE FROM comments WHERE id = p_comment_id;
+            
+            RETURN p_comment_id;
+            END;
+            $$ LANGUAGE plpgsql;
         """)
+
+
 
         # -------------------------
         # COUNT COMMENTS BY POST
@@ -199,10 +225,14 @@ def get_comments_tree(post_id):
         return dict_fetchall(cursor)
 
 
-def delete_comment(comment_id):
+def delete_comment(comment_id, user_id):
     with connection.cursor() as cursor:
-        cursor.execute("SELECT delete_comment_func(%s)", (comment_id,))
-        return cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT delete_comment_func(%s, %s)",
+            [comment_id, user_id]
+        )
+        return cursor.fetchone()
+
 
 
 def count_comments_by_post(post_id):

@@ -88,8 +88,17 @@ def login(request):
         }
 
         token = pyjwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+        
+        # ✅ Отладка
+        print(f"LOGIN DEBUG: user_id={user_id}, type={type(user_id)}")
+        print(f"LOGIN DEBUG: payload={payload}")
+        print(f"LOGIN DEBUG: token={token[:50]}...")
+        
         response = redirect('htmlshablon')
         response.set_cookie('jwt', token, httponly=True, max_age=86400, samesite='Lax')
+        
+        print(f"LOGIN DEBUG: Cookie set successfully")
+        
         return response
 
     return render(request, 'users/login.html')

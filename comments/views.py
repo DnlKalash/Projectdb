@@ -2,60 +2,45 @@ from django.shortcuts import render, redirect
 from posts import sql_posts
 from comments import sql_comments
 from users.views import jwt_required
+from django.contrib import messages
+from django.views.decorators.http import require_http_methods
+from django.db import connection
 
 
+@jwt_required
 def add_comment_view(request, post_id, parent_id=None):
-    """
-    POST: Добавить комментарий к посту или ответ на комментарий.
-    """
     if request.method == "POST":
+        user_id = request.user_id
         content = request.POST.get("content", "").strip()
         
-        print(f"DEBUG: POST data: {request.POST}")
-        print(f"DEBUG: content: {content}")
-        print(f"DEBUG: session: {request.session.items()}")
-        
         if not content:
-            print("DEBUG: Empty content, redirecting")
             return redirect('posts:post-detail-page', post_id=post_id)
-
-        
-        user_id = request.session.get('user_id')
-        print(f"DEBUG: user_id from session: {user_id}")
-        
-        if not user_id:
-            print("DEBUG: No user_id in session, using default 1")
-            user_id = 1  
-        
-        print(f"DEBUG: Adding comment with user_id={user_id}, post_id={post_id}, parent_id={parent_id}")
         
         try:
-            result = sql_comments.add_comment(post_id, user_id, content, parent_id)
-            print(f"DEBUG: Comment added successfully: {result}")
+            sql_comments.add_comment(post_id, user_id, content, parent_id)
+            messages.success(request, "Comment added successfully")
         except Exception as e:
-            print(f"DEBUG: Error adding comment: {e}")
-            import traceback
-            traceback.print_exc()
-        
+            messages.error(request, f"Error adding comment: {e}")
         
         return redirect('posts:post-detail-page', post_id=post_id)
     
-    print("DEBUG: Not POST method, redirecting")
     return redirect('posts:post-detail-page', post_id=post_id)
 
 
+@jwt_required
 def post_detail_view(request, post_id):
-    """
-    GET: Отобразить пост и все комментарии в виде дерева
-    """
     post = sql_posts.get_post_with_tags(post_id)
     if not post:
         return render(request, "404.html", status=404)
 
-    comments_tree = sql_comments.get_comments_tree(post_id)
-    print(f"DEBUG: Comments tree for post {post_id}: {comments_tree}")
+    # ✅ Берём user_id из request
+    current_user_id = getattr(request, 'user_id', None)
+    
+    print(f"VIEW DEBUG: current_user_id = {current_user_id}")
+    print(f"VIEW DEBUG: Type = {type(current_user_id)}")
+    print(f"VIEW DEBUG: request.user_id exists? {hasattr(request, 'user_id')}")
 
-    # Словарь комментариев по id для быстрого построения дерева
+    comments_tree = sql_comments.get_comments_tree(post_id)
     comments_dict = {c['id']: dict(c, children=[]) for c in comments_tree}
     root_comments = []
 
@@ -67,15 +52,36 @@ def post_detail_view(request, post_id):
         else:
             root_comments.append(comments_dict[c['id']])
 
-    print(f"DEBUG: Root comments: {root_comments}")
-
-    return render(request, "posts/post_detail.html", {
+    # ✅ Явно создаём словарь контекста
+    template_context = {
         "post": post,
-        "comments": root_comments
-    })
+        "comments": root_comments,
+        "current_user_id": current_user_id,
+    }
+    
+    print(f"VIEW DEBUG: template_context keys = {template_context.keys()}")
+    print(f"VIEW DEBUG: template_context['current_user_id'] = {template_context['current_user_id']}")
+    
+    # ✅ Дополнительная проверка - выведем весь контекст
+    for key, value in template_context.items():
+        print(f"  {key}: {value} (type: {type(value)})")
+    
+    return render(request, "posts/post_detail.html", template_context)
+
+
 @jwt_required
-def delete_comment_view(request, comment_id, post_id):
-    """Обработка удаления комментария по кнопке"""
-    if request.method == "POST":
-        sql_comments.delete_comment(comment_id)
-    return redirect('posts:post-detail-page', post_id=post_id)
+@require_http_methods(["POST"])
+def comment_delete_view(request, comment_id, post_id):
+    user_id = request.user_id
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT delete_comment_func(%s, %s)",
+                (comment_id, user_id)
+            )
+        messages.success(request, "Comment deleted successfully")
+    except Exception as e:
+        messages.error(request, f"Error: {e}")
+    
+    return redirect("posts:post-detail-page", post_id=post_id)

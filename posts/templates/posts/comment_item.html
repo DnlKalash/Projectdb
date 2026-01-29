@@ -1,0 +1,50 @@
+{% for comment in comments %}
+<div class="comment-item" style="margin-left: {{ comment.level|default:0|add:0 }}px;">
+    <div class="comment-header">
+        <strong>User {{ comment.user_id }}</strong>
+        <small>{{ comment.created_at|date:"Y-m-d H:i" }}</small>
+        <!-- Отладка -->
+        <small style="color: red;">[Current: {{ current_user_id }}, Owner: {{ comment.user_id }}]</small>
+    </div>
+    <p class="comment-content">{{ comment.content }}</p>
+
+    <div class="comment-actions">
+        <!-- Reply form - используем add-reply -->
+        <form method="post" action="{% url 'comments:add-reply' comment.post_id comment.id %}" class="reply-form">
+            {% csrf_token %}
+            <input type="text" name="content" placeholder="Reply..." required>
+            <button type="submit">Reply</button>
+        </form>
+
+        <!-- Delete button (only for comment owner) -->
+        {% if current_user_id == comment.user_id %}
+        <form method="post" action="{% url 'comments:delete-comment' comment.id comment.post_id %}">
+            {% csrf_token %}
+            <button type="submit" class="delete-btn" onclick="return confirm('Delete this comment?');">Delete</button>
+        </form>
+        {% else %}
+        <small style="color: gray;">Not your comment ({{ current_user_id }} vs {{ comment.user_id }})</small>
+        {% endif %}
+    </div>
+
+    <!-- Recursively render children -->
+    {% if comment.children %}
+        <div class="comment-children">
+            {% include 'posts/comment_item.html' with comments=comment.children current_user_id=current_user_id %}
+        </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+<style>
+    .comment-item { margin-bottom: 15px; padding: 12px; background: #f9f9f9; border-radius: 6px; border-left: 3px solid #2196f3; }
+    .comment-header { margin-bottom: 8px; }
+    .comment-header small { color: #999; margin-left: 8px; }
+    .comment-content { margin: 0 0 10px 0; white-space: pre-wrap; line-height: 1.5; }
+    .comment-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .reply-form { display: flex; gap: 8px; flex: 1; }
+    .reply-form input { flex: 1; padding: 6px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px; }
+    .reply-form button { padding: 6px 12px; background: #2196f3; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; }
+    .delete-btn { padding: 4px 10px; font-size: 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .comment-children { margin-left: 20px; margin-top: 10px; }
+</style>

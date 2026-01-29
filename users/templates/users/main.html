@@ -13,22 +13,31 @@
         <button type="button">Go to Profile</button>
     </a>
 
-    <!-- МОИ ПОСТЫ (переход в posts app) -->
-    <a href="{% url 'posts:posts-list-page' %}">
-        <button type="button">My posts</button>
-    </a>
+    <!-- ПОСТЫ -->
+    <div style="margin-top: 15px;">
+        <a href="{% url 'posts:all-posts' %}">
+            <button type="button">All posts</button>
+        </a>
+
+        <a href="{% url 'posts:my-posts' %}">
+            <button type="button">My posts</button>
+        </a>
+    </div>
 
     <!-- Все теги -->
-    <a href="{% url 'tags:list_tags' %}">
-        <button type="button">All tags</button>
-    </a>
+    <div style="margin-top: 15px;">
+        <a href="{% url 'tags:list_tags' %}">
+            <button type="button">All tags</button>
+        </a>
+    </div>
 
     <!-- Logout -->
-    <form action="{% url 'logout' %}" method="post" style="display:inline;">
+    <form action="{% url 'logout' %}" method="post" style="display:inline; margin-top:15px;">
         {% csrf_token %}
         <button type="submit">Logout</button>
     </form>
 {% else %}
     <p>You are not logged in</p>
 {% endif %}
+
 {% endblock %}

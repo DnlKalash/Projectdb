@@ -38,8 +38,11 @@ def init_posts_table():
             content TEXT NOT NULL,
             author_id INTEGER NOT NULL
                 REFERENCES users(id) ON DELETE CASCADE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            -- CHECK constraints
+            CHECK (char_length(title) >= 1),
+            CHECK (char_length(content) >= 5)
+        );
         """)
 
         # -------------------------
@@ -52,7 +55,7 @@ def init_posts_table():
         )
         """)
 
-        # Изменить тип колонки name на TEXT, если она VARCHAR
+        
         cursor.execute("""
         DO $$
         BEGIN
@@ -238,22 +241,28 @@ def init_posts_table():
         # =========================
         # GET POST BY ID
         # =========================
-        cursor.execute("DROP FUNCTION IF EXISTS get_post_by_id_func(INT)")
+        cursor.execute("DROP FUNCTION IF EXISTS get_my_posts_func(INT)")
         cursor.execute("""
-        CREATE FUNCTION get_post_by_id_func(p_id INT)
-        RETURNS TABLE(id INT, title VARCHAR, content TEXT, author_id INT, created_at TIMESTAMP) AS $$
-        BEGIN
-            RETURN QUERY
-            SELECT posts.id, posts.title, posts.content, posts.author_id, posts.created_at
-            FROM posts
-            WHERE posts.id = p_id;
-        END;
-        $$ LANGUAGE plpgsql;
-        """)
-
-        # =========================
-        # GET POST WITH TAGS
-        # =========================
+            CREATE OR REPLACE FUNCTION get_my_posts_func(p_user_id INT)
+            RETURNS TABLE (
+                id INT,
+                title VARCHAR,
+                content TEXT,
+                created_at TIMESTAMP
+            ) AS $$
+            BEGIN
+                RETURN QUERY
+                SELECT
+                    p.id,
+                    p.title,
+                    p.content,
+                    p.created_at
+                FROM posts p
+                WHERE p.author_id = p_user_id
+                ORDER BY p.created_at DESC;
+            END;
+            $$ LANGUAGE plpgsql;
+                """)
         cursor.execute("DROP FUNCTION IF EXISTS get_post_with_tags_func(INT)")
         cursor.execute("""
         CREATE FUNCTION get_post_with_tags_func(p_id INT)
@@ -304,84 +313,114 @@ def init_posts_table():
         # =========================
         # UPDATE POST
         # =========================
-        cursor.execute("DROP FUNCTION IF EXISTS update_post_func(INT, VARCHAR, TEXT)")
+        cursor.execute("DROP FUNCTION IF EXISTS update_post_func(INT, INT, VARCHAR, TEXT)")
         cursor.execute("""
         CREATE FUNCTION update_post_func(
-            p_id INT, p_title VARCHAR DEFAULT NULL, p_content TEXT DEFAULT NULL
-        ) RETURNS TABLE(id INT, title VARCHAR, content TEXT, author_id INT, created_at TIMESTAMP) AS $$
+            p_post_id INT, 
+            p_user_id INT,
+            p_title VARCHAR DEFAULT NULL, 
+            p_content TEXT DEFAULT NULL
+        ) 
+        RETURNS TABLE(
+            id INT, 
+            title VARCHAR, 
+            content TEXT, 
+            author_id INT, 
+            created_at TIMESTAMP
+        ) AS $$
         BEGIN
+            -- Проверяем, что пост принадлежит пользователю
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM posts AS p 
+                WHERE p.id = p_post_id AND p.author_id = p_user_id
+            ) THEN
+                RAISE EXCEPTION 'Cannot update a post you do not own';
+            END IF;
+
+            -- Обновляем пост и возвращаем его
             RETURN QUERY
-            UPDATE posts
-            SET title = COALESCE(p_title, posts.title),
-                content = COALESCE(p_content, posts.content)
-            WHERE posts.id = p_id
-            RETURNING posts.id, posts.title, posts.content, posts.author_id, posts.created_at;
+            UPDATE posts AS p
+            SET 
+                title = COALESCE(p_title, p.title),
+                content = COALESCE(p_content, p.content)
+            WHERE p.id = p_post_id
+            RETURNING p.id, p.title, p.content, p.author_id, p.created_at;
         END;
         $$ LANGUAGE plpgsql;
         """)
+
+        
 
         # =========================
         # DELETE POST
         # =========================
-        cursor.execute("DROP FUNCTION IF EXISTS delete_post_func(INT)")
+        cursor.execute("DROP FUNCTION IF EXISTS delete_post_func(INT, INT)")
         cursor.execute("""
-        CREATE FUNCTION delete_post_func(p_id INT)
-        RETURNS INT AS $$
-        DECLARE del_id INT;
-        BEGIN
-            DELETE FROM posts WHERE id = p_id RETURNING id INTO del_id;
-            RETURN del_id;
-        END;
-        $$ LANGUAGE plpgsql;
-        """)
-
-        # =========================
-        # ADD TAG TO POST
-        # =========================
-        cursor.execute("DROP FUNCTION IF EXISTS add_tag_to_post_func(INT, TEXT)")
-        cursor.execute("""
-        CREATE FUNCTION add_tag_to_post_func(
+        CREATE OR REPLACE FUNCTION delete_post_func(
             p_post_id INT,
-            p_tag_name TEXT
+            p_user_id INT
         )
-        RETURNS TABLE(tag_id INT, tag_name TEXT, success BOOLEAN) AS $$
+        RETURNS INT AS $$
         DECLARE
-            v_tag_id INT;
-            v_exists BOOLEAN;
+            v_author_id INT;
         BEGIN
-            -- Проверить, существует ли уже эта связь
-            SELECT EXISTS(
-                SELECT 1 FROM post_tags pt
-                JOIN tags t ON t.id = pt.tag_id
-                WHERE pt.post_id = p_post_id AND t.name = p_tag_name
-            ) INTO v_exists;
-            
-            IF v_exists THEN
-                -- Связь уже существует
-                SELECT t.id INTO v_tag_id FROM tags t WHERE t.name = p_tag_name;
-                RETURN QUERY SELECT v_tag_id, p_tag_name, FALSE;
-                RETURN;
+            SELECT author_id INTO v_author_id
+            FROM posts
+            WHERE id = p_post_id;
+
+            IF v_author_id IS NULL THEN
+                RAISE EXCEPTION 'Post not found';
+            ELSIF v_author_id <> p_user_id THEN
+                RAISE EXCEPTION 'Cannot delete a post you do not own';
             END IF;
-            
-            -- Найти или создать тег
-            SELECT tags.id INTO v_tag_id FROM tags WHERE tags.name = p_tag_name;
-            
-            IF v_tag_id IS NULL THEN
-                INSERT INTO tags(name)
-                VALUES (p_tag_name)
-                RETURNING tags.id INTO v_tag_id;
-            END IF;
-            
-            -- Привязать тег к посту
-            INSERT INTO post_tags(post_id, tag_id)
-            VALUES (p_post_id, v_tag_id)
-            ON CONFLICT DO NOTHING;
-            
-            RETURN QUERY SELECT v_tag_id, p_tag_name, TRUE;
+
+            DELETE FROM posts WHERE id = p_post_id;
+            RETURN p_post_id;
         END;
         $$ LANGUAGE plpgsql;
         """)
+  
 
+                # =========================
+                # ADD TAG TO POST
+                # =========================
+        cursor.execute("DROP FUNCTION IF EXISTS add_tag_to_post_func(INT,INT, TEXT)")
+        cursor.execute("""
+                CREATE OR REPLACE FUNCTION add_tag_to_post_func(
+                    p_post_id INT,
+                    p_user_id INT,
+                    p_tag_name TEXT
+                )
+                RETURNS TABLE(tag_id INT, tag_name TEXT, success BOOLEAN) AS $$
+                DECLARE
+                    v_tag_id INT;
+                    v_author_id INT;
+                BEGIN
+            -- Проверка владельца
+                    SELECT author_id INTO v_author_id FROM posts WHERE id = p_post_id;
+                    IF v_author_id IS NULL THEN
+                        RAISE EXCEPTION 'Post not found';
+                    ELSIF v_author_id <> p_user_id THEN
+                        RAISE EXCEPTION 'Cannot add tag to a post you do not own';
+                    END IF;
+
+            -- Найти тег
+                    SELECT id INTO v_tag_id FROM tags WHERE name = p_tag_name;
+
+            -- Если тега нет, создать
+                    IF v_tag_id IS NULL THEN
+                        INSERT INTO tags(name) VALUES (p_tag_name) RETURNING id INTO v_tag_id;
+                    END IF;
+
+            -- Привязать тег к посту
+                    INSERT INTO post_tags(post_id, tag_id) VALUES (p_post_id, v_tag_id)
+                    ON CONFLICT DO NOTHING;
+
+                    RETURN QUERY SELECT v_tag_id, p_tag_name, TRUE;
+                END;
+                $$ LANGUAGE plpgsql;
+                """)
         # =========================
         # REMOVE TAG FROM POST
         # =========================
@@ -483,7 +522,43 @@ def init_posts_table():
         $$ LANGUAGE plpgsql;
         """)
 
-    print("✔ posts, tags, post_tags + SQL functions initialized")
+        # =========================
+        # UPDATE MY POST - ИСПРАВЛЕНО
+        # =========================
+        cursor.execute("DROP FUNCTION IF EXISTS update_my_post_func(INT, INT, VARCHAR, TEXT)")
+        cursor.execute("""
+        CREATE OR REPLACE FUNCTION update_my_post_func(
+            p_post_id INT,      
+            p_user_id INT,      
+            p_title VARCHAR,
+            p_content TEXT
+        )
+        RETURNS TABLE(
+            id INT,
+            title VARCHAR,
+            content TEXT,
+            author_id INT,
+            created_at TIMESTAMP
+        ) AS $$
+        BEGIN
+            -- ИСПРАВЛЕНО: используем posts.id вместо просто id
+            IF NOT EXISTS (
+                SELECT 1 FROM posts WHERE posts.id = p_post_id AND posts.author_id = p_user_id
+            ) THEN
+                RAISE EXCEPTION 'Cannot update a post you do not own';
+            END IF;
+
+            RETURN QUERY
+            UPDATE posts
+            SET title = COALESCE(p_title, posts.title),
+                content = COALESCE(p_content, posts.content)
+            WHERE posts.id = p_post_id
+            RETURNING posts.id, posts.title, posts.content, posts.author_id, posts.created_at;
+        END;
+        $$ LANGUAGE plpgsql;
+        """)
+
+        print("✔ posts, tags, post_tags + SQL functions initialized")
 
 
 # =========================
@@ -542,19 +617,22 @@ def update_post(post_id, title=None, content=None):
         return dict_fetchone(cursor)
 
 
-def delete_post(post_id):
+def delete_post(post_id, user_id):
     with connection.cursor() as cursor:
-        cursor.execute("SELECT delete_post_func(%s)", (post_id,))
+        cursor.execute("SELECT delete_post_func(%s, %s)", (post_id, user_id))
         return cursor.fetchone()[0]
 
 
-def add_tag_to_post(post_id, tag_name):
-    """Добавить тег к посту (создается автоматически если не существует)"""
+def add_tag_to_post(post_id, tag_name, user_id):
+    tag_name = tag_name.strip()
     with connection.cursor() as cursor:
-        cursor.execute("SELECT * FROM add_tag_to_post_func(%s, %s)", 
-                      (post_id, tag_name.strip()))
+        cursor.execute(
+            "SELECT * FROM add_tag_to_post_func(%s, %s, %s)",
+            (post_id, user_id, tag_name)
+        )
         result = dict_fetchone(cursor)
         return result
+
 
 
 def remove_tag_from_post(post_id, tag_name):
@@ -596,3 +674,16 @@ def search_posts(query_text, limit=50, offset=0):
         cursor.execute("SELECT * FROM search_posts_func(%s, %s, %s)", 
                       (query_text, limit, offset))
         return dict_fetchall(cursor)
+    
+def get_my_posts(author_id):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT * FROM get_my_posts_func(%s::int)", (author_id,))
+        return dict_fetchall(cursor)
+    
+def update_my_post(post_id, user_id, title=None, content=None):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT * FROM update_my_post_func(%s::int, %s::int, %s::varchar, %s::text)",
+            (post_id, user_id, title, content)
+        )
+        return dict_fetchone(cursor)
