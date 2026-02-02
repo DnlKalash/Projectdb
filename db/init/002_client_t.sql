@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS profile (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
    
-    CHECK (reputation >= 0),
     CHECK (char_length(bio) <= 500)
 );
 

@@ -30,10 +30,9 @@ def profile_update_view(request):
         data = json.loads(request.body)
         avatar_url = data.get("avatar_url")
         bio = data.get("bio")
-        reputation = data.get("reputation")
 
         # Обновляем через SQL-функцию
-        updated = update_profile(request.user_id, avatar_url, bio, reputation)
+        updated = update_profile(request.user_id, avatar_url, bio)
         if updated:
             # Получаем свежие данные
             profile = get_profile(request.user_id)

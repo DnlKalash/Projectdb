@@ -58,6 +58,7 @@ def posts_by_tag_page(request, tag_name):
 # ======================
 # POST DETAIL WITH COMMENTS AND REACTIONS
 # ======================
+@jwt_required
 def post_detail_page(request, post_id):
     """
     Детальная страница поста с комментариями и реакциями
@@ -103,6 +104,7 @@ def post_detail_page(request, post_id):
     return render(request, "posts/post_detail.html", {
         "post": post,
         "comments": root_comments,
+        "current_user_id": request.user_id,
         "likes_count": likes_count,
         "loves_count": loves_count,
         "dislikes_count": dislikes_count,

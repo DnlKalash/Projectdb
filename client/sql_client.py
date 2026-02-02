@@ -37,7 +37,6 @@ def create_profile_table_and_functions():
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
             -- CHECK constraints
-            CHECK (reputation >= 0),
             CHECK (char_length(bio) <= 500)
         );
 
