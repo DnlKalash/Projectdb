@@ -161,25 +161,31 @@ def create_profile(user_id, avatar_url=None, bio=None):
     bio = bio or ''
     with connection.cursor() as cursor:
         cursor.execute("SELECT * FROM create_profile_func(%s, %s, %s)", (user_id, avatar_url, bio))
-        return dict_fetchone(cursor)
+        result = dict_fetchone(cursor)
+    connection.commit()  
+    return result
 
 def get_profile(user_id):
-    create_profile_table_and_functions()  # ДОБАВЛЕНО: создаем функции если их нет
+    create_profile_table_and_functions()  
     with connection.cursor() as cursor:
         cursor.execute("SELECT * FROM get_profile_func(%s)", (user_id,))
         return dict_fetchone(cursor)
 
-def update_profile(user_id, avatar_url=None, bio=None, reputation=None):
+def update_profile(user_id, avatar_url=None, bio=None):
     create_profile_table_and_functions()
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT * FROM update_profile_func(%s, %s, %s, %s)",
-            (user_id, avatar_url, bio, reputation)
+            (user_id, avatar_url, bio, None)  
         )
-        return dict_fetchone(cursor)
+        result = dict_fetchone(cursor)
+    connection.commit() 
+    return result
 
 def delete_profile(user_id):
     create_profile_table_and_functions()
     with connection.cursor() as cursor:
         cursor.execute("SELECT delete_profile_func(%s)", (user_id,))
-        return cursor.fetchone()[0]
+        result = cursor.fetchone()[0]
+    connection.commit()  
+    return result

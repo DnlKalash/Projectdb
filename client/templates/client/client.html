@@ -19,10 +19,12 @@
     <textarea id="bio" name="bio" rows="4"></textarea><br><br>
 
     
-    <input type="number" id="reputation" name="reputation"><br><br>
+    <label for="reputation">Reputation:</label><br>
+    <input type="number" id="reputation" name="reputation" readonly><br><br>
 
     <button type="submit">Save</button>
 </form>
+
 
 <h2>Danger Zone</h2>
 <button id="delete-btn" style="color: red;">Delete Profile</button>
@@ -49,10 +51,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
         avatar_url: document.getElementById("avatar").value || "",
         bio: document.getElementById("bio").value || ""
     };
-    const repValue = document.getElementById("reputation").value;
-    if (repValue !== "") {
-        data.reputation = parseInt(repValue);
-    }
+    
 
     const res = await fetch("{% url 'profile-update' %}", {
         method: "POST",
