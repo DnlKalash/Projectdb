@@ -1,0 +1,43 @@
+{% extends "users/base.html" %}
+{% block title %}Posts with Stats{% endblock %}
+
+{% block content %}
+<h1>📊 All Posts with Statistics</h1>
+
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'posts:trending-posts' %}" style="margin-right: 10px;">🔥 Trending</a>
+    <a href="{% url 'posts:all-posts' %}">📝 Simple List</a>
+</div>
+
+{% for post in posts %}
+<div class="post-card" style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
+    <h3>
+        <a href="{% url 'posts:post-detail-page' post.id %}">{{ post.title }}</a>
+    </h3>
+    <p>{{ post.content|truncatewords:30 }}</p>
+    
+    <!-- Статистика -->
+    <div class="post-stats" style="display: flex; gap: 15px; margin-top: 10px; color: #666;">
+        <span>👍 {{ post.likes_count }} Likes</span>
+        <span>❤️ {{ post.loves_count }} Loves</span>
+        <span>👎 {{ post.dislikes_count }} Dislikes</span>
+        <span>💬 {{ post.comment_count }} Comments</span>
+        <span>🏷️ {{ post.tag_count }} Tags</span>
+    </div>
+    
+    <!-- Теги -->
+    <div style="margin-top: 10px;">
+        <strong>Tags:</strong> {{ post.tag_list }}
+    </div>
+    
+    <!-- Engagement Score -->
+    <div style="margin-top: 10px; font-weight: bold;">
+        📈 Engagement Score: <span style="color: #007bff;">{{ post.engagement_score }}</span>
+    </div>
+    
+    <small style="color: #999;">Posted: {{ post.created_at }}</small>
+</div>
+{% empty %}
+<p>No posts yet.</p>
+{% endfor %}
+{% endblock %}

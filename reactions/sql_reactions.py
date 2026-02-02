@@ -29,98 +29,166 @@ def init_reactions_table():
         # REACTIONS TABLE
         # -------------------------
         cursor.execute("""
-    CREATE TABLE IF NOT EXISTS reactions (
-        id SERIAL PRIMARY KEY,
-        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        reactable_type VARCHAR(20) NOT NULL CHECK (reactable_type IN ('post', 'comment')),
-        reactable_id INT NOT NULL CHECK (reactable_id > 0),
-        reaction_type VARCHAR(20) NOT NULL CHECK (reaction_type IN ('like', 'love', 'dislike')),
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id, reactable_type, reactable_id)
-    );
+        CREATE TABLE IF NOT EXISTS reactions (
+            id SERIAL PRIMARY KEY,
+            user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            reactable_type VARCHAR(20) NOT NULL CHECK (reactable_type IN ('post', 'comment')),
+            reactable_id INT NOT NULL CHECK (reactable_id > 0),
+            reaction_type VARCHAR(20) NOT NULL CHECK (reaction_type IN ('like', 'love', 'dislike')),
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, reactable_type, reactable_id)
+        );
+        """)
 
-    
-    CREATE OR REPLACE FUNCTION update_reputation_on_reaction()
-    RETURNS TRIGGER AS $$
-    DECLARE
-        owner_id INT;
-        reputation_change INT;
-    BEGIN
-        
-        IF NEW.reactable_type = 'post' THEN
-            SELECT author_id INTO owner_id FROM posts WHERE id = NEW.reactable_id;
-        ELSIF NEW.reactable_type = 'comment' THEN
-            SELECT user_id INTO owner_id FROM comments WHERE id = NEW.reactable_id;
-        END IF;
+        # -------------------------
+        # REPUTATION UPDATE TRIGGER (УЛУЧШЕННАЯ ВЕРСИЯ)
+        # -------------------------
+        cursor.execute("""
+        CREATE OR REPLACE FUNCTION update_reputation_on_reaction()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            owner_id INT;
+            old_reputation_change INT := 0;
+            new_reputation_change INT := 0;
+            total_change INT := 0;
+            current_reputation INT;
+        BEGIN
+            RAISE NOTICE '========================================';
+            RAISE NOTICE 'TRIGGER FIRED: % operation', TG_OP;
+            
+            -- Определяем владельца контента
+            IF COALESCE(NEW.reactable_type, OLD.reactable_type) = 'post' THEN
+                SELECT author_id INTO owner_id 
+                FROM posts 
+                WHERE id = COALESCE(NEW.reactable_id, OLD.reactable_id);
+                RAISE NOTICE 'Post owner_id: %', owner_id;
+            ELSIF COALESCE(NEW.reactable_type, OLD.reactable_type) = 'comment' THEN
+                SELECT user_id INTO owner_id 
+                FROM comments 
+                WHERE id = COALESCE(NEW.reactable_id, OLD.reactable_id);
+                RAISE NOTICE 'Comment owner_id: %', owner_id;
+            END IF;
 
-        
-        IF owner_id = NEW.user_id THEN
-            RETURN NEW;
-        END IF;
+            -- Проверяем, найден ли владелец
+            IF owner_id IS NULL THEN
+                RAISE NOTICE 'WARNING: owner_id is NULL - content not found!';
+                IF TG_OP = 'DELETE' THEN
+                    RETURN OLD;
+                ELSE
+                    RETURN NEW;
+                END IF;
+            END IF;
 
-        
-        IF TG_OP = 'INSERT' THEN
-            reputation_change := CASE 
-                WHEN NEW.reaction_type = 'like' THEN 1
-                WHEN NEW.reaction_type = 'love' THEN 2
-                WHEN NEW.reaction_type = 'dislike' THEN -1
-                ELSE 0
-            END;
-            
-            UPDATE profile 
-            SET reputation = reputation + reputation_change 
-            WHERE user_id = owner_id;
-            
-        ELSIF TG_OP = 'DELETE' THEN
-            reputation_change := CASE 
-                WHEN OLD.reaction_type = 'like' THEN -1
-                WHEN OLD.reaction_type = 'love' THEN -2
-                WHEN OLD.reaction_type = 'dislike' THEN 1
-                ELSE 0
-            END;
-            
-            UPDATE profile 
-            SET reputation = reputation + reputation_change 
-            WHERE user_id = owner_id;
-            
-        ELSIF TG_OP = 'UPDATE' THEN
-            -- Отменяем старую реакцию
-            reputation_change := CASE 
-                WHEN OLD.reaction_type = 'like' THEN -1
-                WHEN OLD.reaction_type = 'love' THEN -2
-                WHEN OLD.reaction_type = 'dislike' THEN 1
-                ELSE 0
-            END;
-            
-            -- Добавляем новую реакцию
-            reputation_change := reputation_change + CASE 
-                WHEN NEW.reaction_type = 'like' THEN 1
-                WHEN NEW.reaction_type = 'love' THEN 2
-                WHEN NEW.reaction_type = 'dislike' THEN -1
-                ELSE 0
-            END;
-            
-            UPDATE profile 
-            SET reputation = reputation + reputation_change 
-            WHERE user_id = owner_id;
-        END IF;
+            -- Не даем самому себе менять репутацию
+            IF owner_id = COALESCE(NEW.user_id, OLD.user_id) THEN
+                RAISE NOTICE 'User % trying to react to own content - skipping reputation change', owner_id;
+                IF TG_OP = 'DELETE' THEN
+                    RETURN OLD;
+                ELSE
+                    RETURN NEW;
+                END IF;
+            END IF;
 
-        IF TG_OP = 'DELETE' THEN
-            RETURN OLD;
-        ELSE
-            RETURN NEW;
-        END IF;
-    END;
-    $$ LANGUAGE plpgsql;
+            -- Получаем текущую репутацию
+            SELECT reputation INTO current_reputation FROM profile WHERE user_id = owner_id;
+            RAISE NOTICE 'Current reputation of user %: %', owner_id, current_reputation;
 
-    
-    DROP TRIGGER IF EXISTS trigger_update_reputation ON reactions;
-    CREATE TRIGGER trigger_update_reputation
-    AFTER INSERT OR UPDATE OR DELETE ON reactions
-    FOR EACH ROW
-    EXECUTE FUNCTION update_reputation_on_reaction();
-""")
+            -- INSERT: добавляем репутацию
+            IF TG_OP = 'INSERT' THEN
+                new_reputation_change := CASE 
+                    WHEN NEW.reaction_type = 'like' THEN 1
+                    WHEN NEW.reaction_type = 'love' THEN 2
+                    WHEN NEW.reaction_type = 'dislike' THEN -1
+                    ELSE 0
+                END;
+                
+                RAISE NOTICE 'INSERT: user_id=%, reactable_type=%, reactable_id=%, reaction=%', 
+                    NEW.user_id, NEW.reactable_type, NEW.reactable_id, NEW.reaction_type;
+                RAISE NOTICE 'INSERT: Adding % reputation to user %', new_reputation_change, owner_id;
+                
+                UPDATE profile 
+                SET reputation = reputation + new_reputation_change 
+                WHERE user_id = owner_id;
+                
+                SELECT reputation INTO current_reputation FROM profile WHERE user_id = owner_id;
+                RAISE NOTICE 'New reputation after INSERT: %', current_reputation;
+                
+            -- DELETE: убираем репутацию
+            ELSIF TG_OP = 'DELETE' THEN
+                old_reputation_change := CASE 
+                    WHEN OLD.reaction_type = 'like' THEN -1
+                    WHEN OLD.reaction_type = 'love' THEN -2
+                    WHEN OLD.reaction_type = 'dislike' THEN 1
+                    ELSE 0
+                END;
+                
+                RAISE NOTICE 'DELETE: user_id=%, reactable_type=%, reactable_id=%, reaction=%', 
+                    OLD.user_id, OLD.reactable_type, OLD.reactable_id, OLD.reaction_type;
+                RAISE NOTICE 'DELETE: Changing reputation by % for user %', old_reputation_change, owner_id;
+                
+                UPDATE profile 
+                SET reputation = reputation + old_reputation_change 
+                WHERE user_id = owner_id;
+                
+                SELECT reputation INTO current_reputation FROM profile WHERE user_id = owner_id;
+                RAISE NOTICE 'New reputation after DELETE: %', current_reputation;
+                
+            -- UPDATE: отменяем старую и добавляем новую
+            ELSIF TG_OP = 'UPDATE' THEN
+                -- Отменяем старую реакцию
+                old_reputation_change := CASE 
+                    WHEN OLD.reaction_type = 'like' THEN -1
+                    WHEN OLD.reaction_type = 'love' THEN -2
+                    WHEN OLD.reaction_type = 'dislike' THEN 1
+                    ELSE 0
+                END;
+                
+                -- Добавляем новую реакцию
+                new_reputation_change := CASE 
+                    WHEN NEW.reaction_type = 'like' THEN 1
+                    WHEN NEW.reaction_type = 'love' THEN 2
+                    WHEN NEW.reaction_type = 'dislike' THEN -1
+                    ELSE 0
+                END;
+                
+                total_change := old_reputation_change + new_reputation_change;
+                
+                RAISE NOTICE 'UPDATE: user_id=%, reactable_type=%, reactable_id=%', 
+                    NEW.user_id, NEW.reactable_type, NEW.reactable_id;
+                RAISE NOTICE 'UPDATE: Changing from % to % for user %, total change: %', 
+                    OLD.reaction_type, NEW.reaction_type, owner_id, total_change;
+                
+                -- Применяем изменение
+                UPDATE profile 
+                SET reputation = reputation + total_change
+                WHERE user_id = owner_id;
+                
+                SELECT reputation INTO current_reputation FROM profile WHERE user_id = owner_id;
+                RAISE NOTICE 'New reputation after UPDATE: %', current_reputation;
+            END IF;
 
+            RAISE NOTICE '========================================';
+
+            IF TG_OP = 'DELETE' THEN
+                RETURN OLD;
+            ELSE
+                RETURN NEW;
+            END IF;
+        END;
+        $$ LANGUAGE plpgsql;
+        """)
+
+        cursor.execute("""
+        DROP TRIGGER IF EXISTS trigger_update_reputation ON reactions;
+        CREATE TRIGGER trigger_update_reputation
+        AFTER INSERT OR UPDATE OR DELETE ON reactions
+        FOR EACH ROW
+        EXECUTE FUNCTION update_reputation_on_reaction();
+        """)
+
+        # -------------------------
+        # FOREIGN KEY VALIDATION
+        # -------------------------
         cursor.execute("""
         CREATE OR REPLACE FUNCTION validate_reaction_fk()
         RETURNS TRIGGER AS $$
@@ -148,20 +216,26 @@ def init_reactions_table():
         FOR EACH ROW
         EXECUTE FUNCTION validate_reaction_fk();
         """)
-        
 
-                # Индексы для быстрого поиска
+        # -------------------------
+        # INDEXES
+        # -------------------------
         cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_reactions_post 
-                ON reactions(reactable_type, reactable_id) 
-                WHERE reactable_type = 'post'
-                """)
-                
+        CREATE INDEX IF NOT EXISTS idx_reactions_post 
+        ON reactions(reactable_type, reactable_id) 
+        WHERE reactable_type = 'post';
+        """)
+        
         cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_reactions_comment 
-                ON reactions(reactable_type, reactable_id) 
-                WHERE reactable_type = 'comment'
-                """)
+        CREATE INDEX IF NOT EXISTS idx_reactions_comment 
+        ON reactions(reactable_type, reactable_id) 
+        WHERE reactable_type = 'comment';
+        """)
+
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_reactions_user 
+        ON reactions(user_id);
+        """)
 
         # =========================
         # ADD OR UPDATE REACTION
@@ -176,6 +250,9 @@ def init_reactions_table():
         )
         RETURNS TABLE(r_id INT, r_user_id INT, r_reactable_type VARCHAR, r_reactable_id INT, r_reaction_type VARCHAR) AS $$
         BEGIN
+            RAISE NOTICE 'add_or_update_reaction_func called: user_id=%, type=%, id=%, reaction=%', 
+                p_user_id, p_reactable_type, p_reactable_id, p_reaction_type;
+            
             RETURN QUERY
             INSERT INTO reactions(user_id, reactable_type, reactable_id, reaction_type, created_at)
             VALUES (p_user_id, p_reactable_type, p_reactable_id, p_reaction_type, NOW())
@@ -200,6 +277,9 @@ def init_reactions_table():
         DECLARE
             deleted BOOLEAN := FALSE;
         BEGIN
+            RAISE NOTICE 'remove_reaction_func called: user_id=%, type=%, id=%', 
+                p_user_id, p_reactable_type, p_reactable_id;
+            
             DELETE FROM reactions 
             WHERE user_id = p_user_id 
               AND reactable_type = p_reactable_type 
@@ -207,6 +287,9 @@ def init_reactions_table():
             
             IF FOUND THEN
                 deleted := TRUE;
+                RAISE NOTICE 'Reaction deleted successfully';
+            ELSE
+                RAISE NOTICE 'No reaction found to delete';
             END IF;
             
             RETURN deleted;
@@ -325,6 +408,7 @@ def init_reactions_table():
         $$ LANGUAGE plpgsql;
         """)
 
+    connection.commit()
     print("✔ reactions table + SQL functions initialized")
 
 # =========================
@@ -333,22 +417,30 @@ def init_reactions_table():
 
 def add_or_update_reaction(user_id, reactable_type, reactable_id, reaction_type):
     """Добавить или обновить реакцию"""
+    print(f"[Python] add_or_update_reaction: user_id={user_id}, type={reactable_type}, id={reactable_id}, reaction={reaction_type}")
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT * FROM add_or_update_reaction_func(%s, %s, %s, %s)",
             (user_id, reactable_type, reactable_id, reaction_type)
         )
-        return dict_fetchone(cursor)
+        result = dict_fetchone(cursor)
+    connection.commit()
+    print(f"[Python] Result: {result}")
+    return result
 
 
 def remove_reaction(user_id, reactable_type, reactable_id):
     """Удалить реакцию"""
+    print(f"[Python] remove_reaction: user_id={user_id}, type={reactable_type}, id={reactable_id}")
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT remove_reaction_func(%s, %s, %s)",
             (user_id, reactable_type, reactable_id)
         )
-        return cursor.fetchone()[0]
+        result = cursor.fetchone()[0]
+    connection.commit()
+    print(f"[Python] Deleted: {result}")
+    return result
 
 
 def get_post_reactions_stats(post_id):

@@ -1,0 +1,48 @@
+{% extends "users/base.html" %}
+{% block title %}Most Active Users{% endblock %}
+
+{% block content %}
+<h1>🔥 Most Active Users</h1>
+
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'leaderboard' %}">🏆 View Leaderboard</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+    {% for user in users %}
+    <div style="border: 2px solid #667eea; padding: 20px; border-radius: 10px; background: white;">
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+            {% if user.avatar_url %}
+            <img src="{{ user.avatar_url }}" width="60" height="60" style="border-radius: 50%;" alt="Avatar">
+            {% else %}
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: #667eea; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5em;">
+                {{ user.username|first|upper }}
+            </div>
+            {% endif %}
+            <div>
+                <h3 style="margin: 0;">{{ user.username }}</h3>
+                <p style="margin: 5px 0; color: #666; font-size: 0.9em;">{{ user.bio|truncatewords:8 }}</p>
+            </div>
+        </div>
+        
+        <div style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <div style="font-size: 2em; font-weight: bold; color: #667eea; text-align: center;">
+                {{ user.total_contributions }}
+            </div>
+            <div style="text-align: center; color: #666; font-size: 0.9em;">Total Contributions</div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; font-size: 0.9em;">
+            <span>📝 {{ user.posts_count }} posts</span>
+            <span>💬 {{ user.comments_count }} comments</span>
+        </div>
+        
+        <div style="margin-top: 10px; text-align: center; color: #666;">
+            ⭐ Reputation: <strong>{{ user.reputation }}</strong>
+        </div>
+    </div>
+    {% empty %}
+    <p>No users yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

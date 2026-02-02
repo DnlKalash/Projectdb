@@ -1,0 +1,32 @@
+{% extends "users/base.html" %}
+{% block title %}Posts tagged: {{ tag_name }}{% endblock %}
+
+{% block content %}
+<h1>🏷️ Posts tagged: <span style="color: #007bff;">{{ tag_name }}</span></h1>
+
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'posts:all-posts' %}">← Back to All Posts</a>
+</div>
+
+{% for post in posts %}
+<div class="post-card" style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
+    <h3>
+        <a href="{% url 'posts:post-detail-page' post.id %}">{{ post.title }}</a>
+    </h3>
+    <p>{{ post.content|truncatewords:30 }}</p>
+    
+    <div class="post-stats" style="display: flex; gap: 15px; margin-top: 10px; color: #666;">
+        <span>👍 {{ post.likes_count }}</span>
+        <span>❤️ {{ post.loves_count }}</span>
+        <span>💬 {{ post.comment_count }}</span>
+        <span>📈 Score: {{ post.engagement_score }}</span>
+    </div>
+    
+    <div style="margin-top: 10px;">
+        <strong>All Tags:</strong> {{ post.tag_list }}
+    </div>
+</div>
+{% empty %}
+<p>No posts with tag "{{ tag_name }}".</p>
+{% endfor %}
+{% endblock %}

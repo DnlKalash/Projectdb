@@ -1,0 +1,83 @@
+{% extends "users/base.html" %}
+{% block title %}All Users{% endblock %}
+
+{% block content %}
+<h1>👥 All Users</h1>
+
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'leaderboard' %}">🏆 Leaderboard</a> | 
+    <a href="{% url 'most-active-users' %}">🔥 Most Active</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+    {% for user in users %}
+    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 10px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <!-- Header with Avatar -->
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #f0f0f0;">
+            {% if user.avatar_url %}
+            <img src="{{ user.avatar_url }}" width="60" height="60" style="border-radius: 50%; border: 2px solid #667eea;" alt="Avatar">
+            {% else %}
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.8em; font-weight: bold;">
+                {{ user.username|first|upper }}
+            </div>
+            {% endif %}
+            
+            <div style="flex: 1;">
+                <h3 style="margin: 0; color: #333;">{{ user.username }}</h3>
+                <p style="margin: 5px 0; color: #666; font-size: 0.9em;">{{ user.email }}</p>
+            </div>
+        </div>
+        
+        <!-- Bio -->
+        {% if user.bio %}
+        <p style="color: #666; font-size: 0.95em; margin-bottom: 15px; font-style: italic;">
+            "{{ user.bio|truncatewords:15 }}"
+        </p>
+        {% endif %}
+        
+        <!-- Reputation Badge -->
+        <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="font-size: 0.9em; opacity: 0.9;">Reputation</div>
+            <div style="font-size: 2.5em; font-weight: bold;">⭐ {{ user.reputation }}</div>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div style="background: #e3f2fd; padding: 10px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 1.5em;">📝</div>
+                <div style="font-size: 1.3em; font-weight: bold; color: #1976d2;">{{ user.posts_count }}</div>
+                <div style="font-size: 0.85em; color: #666;">Posts</div>
+            </div>
+            
+            <div style="background: #f3e5f5; padding: 10px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 1.5em;">💬</div>
+                <div style="font-size: 1.3em; font-weight: bold; color: #7b1fa2;">{{ user.comments_count }}</div>
+                <div style="font-size: 0.85em; color: #666;">Comments</div>
+            </div>
+            
+            <div style="background: #fff3e0; padding: 10px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 1.5em;">🎯</div>
+                <div style="font-size: 1.3em; font-weight: bold; color: #f57c00;">{{ user.total_contributions }}</div>
+                <div style="font-size: 0.85em; color: #666;">Contributions</div>
+            </div>
+            
+            <div style="background: #fce4ec; padding: 10px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 1.5em;">❤️</div>
+                <div style="font-size: 1.3em; font-weight: bold; color: #c2185b;">{{ user.total_reactions_received }}</div>
+                <div style="font-size: 0.85em; color: #666;">Reactions</div>
+            </div>
+        </div>
+        
+        <!-- Timestamps -->
+        <div style="font-size: 0.85em; color: #999; border-top: 1px solid #f0f0f0; padding-top: 10px;">
+            <div>📅 Joined: {{ user.profile_created_at|date:"M d, Y" }}</div>
+            {% if user.last_activity_at %}
+            <div>🕒 Last active: {{ user.last_activity_at|date:"M d, Y" }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <p>No users yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

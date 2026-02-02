@@ -3,41 +3,112 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<h1>Main page</h1>
+<h1>🏠 Main Page</h1>
 
 {% if username %}
-    <p>You are logged in as {{ username }}</p>
+    <p>You are logged in as <strong>{{ username }}</strong></p>
 
-    <!-- Профиль -->
-    <a href="{% url 'profile-detail-page' %}">
-        <button type="button">Go to Profile</button>
-    </a>
+    <!-- ========================================= -->
+    <!-- ПРОФИЛЬ -->
+    <!-- ========================================= -->
+    <div style="margin-top: 20px; padding: 15px; background: #f0f4ff; border-radius: 8px;">
+        <h3>👤 Profile</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <a href="{% url 'profile-detail-page' %}">
+                <button type="button">My Profile</button>
+            </a>
+            <a href="{% url 'profile-stats' %}">
+                <button type="button" style="background: #667eea; color: white;">📊 Profile with Stats</button>
+            </a>
+            <a href="{% url 'profile-edit-page' %}">
+                <button type="button">✏️ Edit Profile</button>
+            </a>
+        </div>
+    </div>
 
+    <!-- ========================================= -->
     <!-- ПОСТЫ -->
-    <div style="margin-top: 15px;">
-        <a href="{% url 'posts:all-posts' %}">
-            <button type="button">All posts</button>
-        </a>
-
-        <a href="{% url 'posts:my-posts' %}">
-            <button type="button">My posts</button>
-        </a>
+    <!-- ========================================= -->
+    <div style="margin-top: 20px; padding: 15px; background: #fff0f6; border-radius: 8px;">
+        <h3>📝 Posts</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <a href="{% url 'posts:all-posts' %}">
+                <button type="button">All Posts</button>
+            </a>
+            <a href="{% url 'posts:my-posts' %}">
+                <button type="button">My Posts</button>
+            </a>
+            <a href="{% url 'posts:post-create-page' %}">
+                <button type="button" style="background: #28a745; color: white;">➕ Create Post</button>
+            </a>
+        </div>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+            <a href="{% url 'posts:posts-list-stats' %}">
+                <button type="button" style="background: #667eea; color: white;">📊 Posts with Stats</button>
+            </a>
+            <a href="{% url 'posts:trending-posts' %}">
+                <button type="button" style="background: #ff6b6b; color: white;">🔥 Trending Posts</button>
+            </a>
+        </div>
     </div>
 
-    <!-- Все теги -->
-    <div style="margin-top: 15px;">
+    <!-- ========================================= -->
+    <!-- ТЕГИ -->
+    <!-- ========================================= -->
+    <div style="margin-top: 20px; padding: 15px; background: #fff9e6; border-radius: 8px;">
+        <h3>🏷️ Tags</h3>
         <a href="{% url 'tags:list_tags' %}">
-            <button type="button">All tags</button>
+            <button type="button">All Tags</button>
         </a>
     </div>
 
-    <!-- Logout -->
-    <form action="{% url 'logout' %}" method="post" style="display:inline; margin-top:15px;">
-        {% csrf_token %}
-        <button type="submit">Logout</button>
-    </form>
+    <!-- ========================================= -->
+    <!-- ПОЛЬЗОВАТЕЛИ И СТАТИСТИКА -->
+    <!-- ========================================= -->
+    <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px;">
+        <h3>👥 Community</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <a href="{% url 'leaderboard' %}">
+                <button type="button" style="background: #ffd700; color: #333; font-weight: bold;">🏆 Leaderboard</button>
+            </a>
+            <a href="{% url 'most-active' %}">
+                <button type="button" style="background: #667eea; color: white;">🔥 Most Active Users</button>
+            </a>
+            <a href="{% url 'all-users' %}">
+                <button type="button" style="background: #764ba2; color: white;">👥 All Users</button>
+            </a>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- LOGOUT -->
+    <!-- ========================================= -->
+    <div style="margin-top: 20px;">
+        <form action="{% url 'logout' %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" style="background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">
+                🚪 Logout
+            </button>
+        </form>
+    </div>
+
 {% else %}
-    <p>You are not logged in</p>
+    <div style="text-align: center; margin-top: 50px;">
+        <p style="font-size: 1.2em; color: #666;">You are not logged in</p>
+        <div style="margin-top: 20px; display: flex; gap: 15px; justify-content: center;">
+            <a href="{% url 'login' %}">
+                <button type="button" style="background: #667eea; color: white; padding: 12px 30px; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em;">
+                    🔐 Login
+                </button>
+            </a>
+            <a href="{% url 'register' %}">
+                <button type="button" style="background: #28a745; color: white; padding: 12px 30px; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em;">
+                    📝 Register
+                </button>
+            </a>
+        </div>
+    </div>
 {% endif %}
 
 {% endblock %}

@@ -1,0 +1,66 @@
+{% extends "users/base.html" %}
+{% block title %}Trending Posts{% endblock %}
+
+{% block content %}
+<h1>🔥 Trending Posts</h1>
+
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'posts:all-posts' %}">← Back to All Posts</a>
+</div>
+
+{% for post in posts %}
+<div class="trending-post" style="border: 2px solid #ff6b6b; padding: 20px; margin-bottom: 20px; border-radius: 10px; background: #fff5f5;">
+    <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div style="flex: 1;">
+            <h2>
+                <a href="{% url 'posts:post-detail-page' post.id %}" style="color: #c92a2a;">
+                    {{ post.title }}
+                </a>
+            </h2>
+            <p>{{ post.content|truncatewords:40 }}</p>
+        </div>
+        
+        <!-- Большой счетчик популярности -->
+        <div style="text-align: center; min-width: 100px;">
+            <div style="font-size: 3em; color: #ff6b6b; font-weight: bold;">
+                {{ post.engagement_score }}
+            </div>
+            <div style="font-size: 0.9em; color: #666;">SCORE</div>
+        </div>
+    </div>
+    
+    <!-- Детальная статистика -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 15px;">
+        <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+            <div style="font-size: 1.5em;">👍</div>
+            <div style="font-size: 1.2em; font-weight: bold;">{{ post.likes_count }}</div>
+            <div style="font-size: 0.8em; color: #666;">Likes</div>
+        </div>
+        
+        <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+            <div style="font-size: 1.5em;">❤️</div>
+            <div style="font-size: 1.2em; font-weight: bold;">{{ post.loves_count }}</div>
+            <div style="font-size: 0.8em; color: #666;">Loves</div>
+        </div>
+        
+        <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+            <div style="font-size: 1.5em;">💬</div>
+            <div style="font-size: 1.2em; font-weight: bold;">{{ post.comment_count }}</div>
+            <div style="font-size: 0.8em; color: #666;">Comments</div>
+        </div>
+        
+        <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+            <div style="font-size: 1.5em;">🏷️</div>
+            <div style="font-size: 1.2em; font-weight: bold;">{{ post.tag_count }}</div>
+            <div style="font-size: 0.8em; color: #666;">Tags</div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 10px;">
+        <strong>Tags:</strong> {{ post.tag_list }}
+    </div>
+</div>
+{% empty %}
+<p>No trending posts yet.</p>
+{% endfor %}
+{% endblock %}

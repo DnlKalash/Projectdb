@@ -1,0 +1,55 @@
+{% extends "users/base.html" %}
+{% block title %}Leaderboard{% endblock %}
+
+{% block content %}
+<h1>🏆 Top Users by Reputation</h1>
+
+<table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    <thead>
+        <tr style="background: #667eea; color: white;">
+            <th style="padding: 15px; text-align: left;">Rank</th>
+            <th style="padding: 15px; text-align: left;">User</th>
+            <th style="padding: 15px; text-align: center;">Reputation</th>
+            <th style="padding: 15px; text-align: center;">Posts</th>
+            <th style="padding: 15px; text-align: center;">Comments</th>
+            <th style="padding: 15px; text-align: center;">Contributions</th>
+            <th style="padding: 15px; text-align: center;">Reactions Received</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr style="border-bottom: 1px solid #ddd; {% if forloop.counter <= 3 %}background: #fff9e6;{% endif %}">
+            <td style="padding: 15px; font-weight: bold; font-size: 1.2em;">
+                {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
+            </td>
+            <td style="padding: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    {% if user.avatar_url %}
+                    <img src="{{ user.avatar_url }}" width="40" height="40" style="border-radius: 50%;" alt="Avatar">
+                    {% else %}
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #667eea; color: white; display: flex; align-items: center; justify-content: center;">
+                        {{ user.username|first|upper }}
+                    </div>
+                    {% endif %}
+                    <div>
+                        <strong>{{ user.username }}</strong>
+                        <div style="font-size: 0.9em; color: #666;">{{ user.bio|truncatewords:10 }}</div>
+                    </div>
+                </div>
+            </td>
+            <td style="padding: 15px; text-align: center; font-weight: bold; color: #667eea; font-size: 1.3em;">
+                {{ user.reputation }}
+            </td>
+            <td style="padding: 15px; text-align: center;">{{ user.posts_count }}</td>
+            <td style="padding: 15px; text-align: center;">{{ user.comments_count }}</td>
+            <td style="padding: 15px; text-align: center; font-weight: bold;">{{ user.total_contributions }}</td>
+            <td style="padding: 15px; text-align: center;">{{ user.total_reactions_received }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="7" style="padding: 20px; text-align: center; color: #666;">No users yet.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
